@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="description" content="admin-themes-lab">
+    <meta name="author" content="themes-lab">
+    <link rel="shortcut icon" href="img/favicon.png" type="image/png">
+    <title>OCTO ADMIN BOT BUILDER</title>
+    <link href="../assets/global/css/style.css" rel="stylesheet">
+    <link href="../assets/global/css/theme.css" rel="stylesheet">
+    <link href="../assets/global/css/ui.css" rel="stylesheet">
+    <link href="../assets/admin/md-layout1/material-design/css/material.css" rel="stylesheet">
+    <link href="../assets/admin/md-layout1/css/layout.css" rel="stylesheet">
+    <link href="../assets/global/plugins/dropzone/dropzone.min.css" rel="stylesheet">
+    <link href="../assets/global/plugins/input-text/style.min.css" rel="stylesheet">
+    <link href="../assets/admin/layout4/css/layout.css" rel="stylesheet">
+    <script src="../assets/global/plugins/modernizr/modernizr-2.6.2-respond-1.1.0.min.js"></script>
+    <script src="js/go.js"></script>
+    <script type="text/javascript">
+      function init() { 
+        var $ = go.GraphObject.make;
+        myDiagram = $(go.Diagram, "myDiagramDiv",
+          {
+            initialContentAlignment: go.Spot.Center,
+            allowDrop: true,
+            "LinkDrawn": showLinkLabel,
+            "LinkRelinked": showLinkLabel,
+            "animationManager.duration": 1500,
+            "undoManager.isEnabled": true
+          });
+
+        function nodeStyle(){
+          return [
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          {
+            locationSpot: go.Spot.Center,
+            isShadowed: true,
+            // shadowColor: "#888",
+            mouseEnter: function (e, obj) { showPorts(obj.part, true); },
+            mouseLeave: function (e, obj) { showPorts(obj.part, false); }
+          }
+          ];
+        }
+
+        function makePort(name, spot, output, input){
+          return $(go.Shape, "Circle",
+          {
+            fill: "transparent",
+            stroke: null,
+            desiredSize: new go.Size(8, 8),
+            alignment: spot, alignmentFocus: spot,
+            portId: name,
+            fromSpot: spot, toSpot: spot,
+            fromLinkable: output, toLinkable: input,
+            cursor: "pointer"
+          });
+        }
+
+        var lightText = '#212121';
+
+        myDiagram.nodeTemplateMap.add("",
+          $(go.Node, "Spot", nodeStyle(),
+            $(go.Panel, "Auto",
+              $(go.Shape, "RoundedRectangle",
+                { fill: "white", stroke: "#03a9f4", strokeWidth: "3" },
+                new go.Binding("figure", "figure")),
+              $(go.TextBlock,
+              {
+                font: "bold 10pt Helvetica, Arial, sans-serif",
+                stroke: lightText,
+                margin: 5,
+                maxSize: new go.Size(180, NaN),
+                wrap: go.TextBlock.WrapDesiredSize,
+                text: "textAlign: 'left'",
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay())
+              ),
+            makePort("T", go.Spot.Top, false, true),
+            makePort("L", go.Spot.Left, true, true),
+            makePort("R", go.Spot.Right, true, true),
+            makePort("B", go.Spot.Bottom, true, false)
+            ));
+
+        myDiagram.nodeTemplateMap.add("Start",
+          $(go.Node, "Spot", nodeStyle(),
+            $(go.Panel, "Auto",
+              $(go.Shape, "Circle",
+                { minSize: new go.Size(40, 40), fill: "white", stroke: "#0097a7", strokeWidth: "3" }),
+              $(go.TextBlock, "Start",
+                { font: "bold 10pt Helvetica, Arial, sans-serif", stroke: lightText, editable: true },
+                new go.Binding("text"))
+              ),
+            makePort("L", go.Spot.Left, true, false),
+            makePort("R", go.Spot.Right, true, false),
+            makePort("B", go.Spot.Bottom, true, false)
+            ));
+
+        myDiagram.nodeTemplateMap.add("End",
+          $(go.Node, "Spot", nodeStyle(),
+            $(go.Panel, "Auto",
+              $(go.Shape, "Circle",
+                { minSize: new go.Size(40, 40), fill: 'white', stroke: "#ff1744", strokeWidth: "3" }),
+              $(go.TextBlock, "End",
+                { font: "bold 11pt Helvetica, Arial, sans-serif", stroke: lightText },
+                new go.Binding("text"))
+              ),
+
+            makePort("T", go.Spot.Top, false, true),
+            makePort("L", go.Spot.Left, false, true),
+            makePort("R", go.Spot.Right, false, true)
+            ));
+
+        myDiagram.nodeTemplateMap.add("Comment",
+              $(go.Node, "Auto", nodeStyle(),
+                $(go.Shape, "File",
+                  { fill: "white", stroke: "#FF9800", strokeWidth: "3" }),
+                $(go.TextBlock,
+                  {
+                    margin: 5,
+                    maxSize: new go.Size(200, NaN),
+                    wrap: go.TextBlock.WrapFit,
+                    textAlign: "center",
+                    editable: true,
+                    font: "bold 12pt Helvetica, Arial, sans-serif",
+                    stroke: '#424242'
+                  },
+                  new go.Binding("text").makeTwoWay())
+                // no ports, because no links are allowed to connect with a comment
+              ));
+
+        myDiagram.linkTemplate =
+              $(go.Link,  // the whole link panel
+                {
+                  routing: go.Link.AvoidsNodes,
+                  curve: go.Link.JumpOver,
+                  corner: 5, toShortLength: 4,
+                  relinkableFrom: true,
+                  relinkableTo: true,
+                  reshapable: true,
+                  resegmentable: true,
+                  // mouse-overs subtly highlight links:
+                  mouseEnter: function(e, link) { link.findObject("HIGHLIGHT").stroke = "#81d4fa"; },
+                  mouseLeave: function(e, link) { link.findObject("HIGHLIGHT").stroke = "transparent"; }
+                },
+                new go.Binding("points").makeTwoWay(),
+                $(go.Shape,  // the highlight shape, normally transparent
+                  { isPanelMain: true, strokeWidth: 8, stroke: "transparent", name: "HIGHLIGHT" }),
+                $(go.Shape,  // the link path shape
+                  { isPanelMain: true, stroke: "gray", strokeWidth: 2 }),
+                $(go.Shape,  // the arrowhead
+                  { toArrow: "standard", stroke: null, fill: "#9e9e9e"}),
+                $(go.Panel, "Auto",  // the link label, normally not visible
+                  { visible: false, name: "LABEL", segmentIndex: 2, segmentFraction: 0.5},
+                  new go.Binding("visible", "visible").makeTwoWay(),
+                  $(go.Shape, "RoundedRectangle",  // the label shape
+                    { fill: "#eeeeee", stroke: null }),
+                  $(go.TextBlock, "Yes",  // the label
+                    {
+                      textAlign: "center",
+                      font: "10pt helvetica, arial, sans-serif",
+                      stroke: "#212121",
+                      editable: true
+                    },
+                    new go.Binding("text").makeTwoWay())
+                )
+              );
+
+        function showLinkLabel(e) {
+          var label = e.subject.findObject("LABEL");
+          if (label !== null) label.visible = (e.subject.fromNode.data.figure === "Diamond");
+        }
+
+        myDiagram.toolManager.linkingTool.temporaryLink.routing = go.Link.Orthogonal;
+        myDiagram.toolManager.relinkingTool.temporaryLink.routing = go.Link.Orthogonal;
+
+        load();
+
+        var myPalette = 
+          $(go.Palette, "myPalette",
+          {
+            "animationManager.duration": 1000,
+            nodeTemplateMap: myDiagram.nodeTemplateMap,
+            model: new go.GraphLinksModel([
+              { category: "Start", text: "Start" },
+              { text: "Step"},
+              { text: "???", figure: "Diagrammond" },
+              { category: "End", text: "End" },
+              { category: "Comment", text: "Comment" }
+              ])
+          });
+      } 
+
+      function showPorts(node, show) {
+        var diagram = node.diagram;
+        if (!diagram || diagram.isReadOnly || !diagram.allowLink) return;
+        node.ports.each(function(port) {
+          port.stroke = (show ? "white" : null);
+        });
+      }
+
+      function load() {
+            myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"Ask the User's name"},
+              {"key":1, "loc":"175 100", "text":"Select Product"},
+              {"key":2, "loc":"175 190", "text":"Add to Cart"},
+              {"key":3, "loc":"175 270", "text":"Calculate Subtotal"},
+              {"key":4, "loc":"175 370", "text":"Is Checkout?"},
+              {"key":9, "loc":"400 420", "text":"Customer Exists?"},
+              {"key":5, "loc":"175 470", "text":"Register"},
+              {"key":6, "loc":"625 470", "text":"Log in"},
+              {"key":7, "loc":"400 520", "text":"Process Payment"},
+              {"key":-2, "category":"End", "loc":"400 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":9, "fromPort":"R", "toPort":"T", "visible":"true", "text":"Yes"},
+              {"from":4, "to":0, "fromPort":"L", "toPort":"B", "visible":"true", "text":"No"},
+              {"from":9, "to":6, "fromPort":"R", "toPort":"T", "visible":"true", "text":"Yes"},
+              {"from":9, "to":5, "fromPort":"L", "toPort":"T", "visible":"true", "text":"No"},
+              {"from":0, "to":1, "fromPort":"T", "toPort":"L"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"R"},
+              {"from":5, "to":7, "fromPort":"B", "toPort":"L"},
+              {"from":7, "to":-2, "fromPort":"B", "toPort":"T"}
+
+               ]});
+
+            onboarding.onclick = function(){
+            myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"Ask the User's name"},
+              {"key":1, "loc":"175 100", "text":"Select Product"},
+              {"key":2, "loc":"175 190", "text":"Add to Cart"},
+              {"key":3, "loc":"175 270", "text":"Calculate Subtotal"},
+              {"key":4, "loc":"175 370", "text":"Is Checkout?"},
+              {"key":9, "loc":"400 420", "text":"Customer Exists?"},
+              {"key":5, "loc":"175 470", "text":"Register"},
+              {"key":6, "loc":"625 470", "text":"Log in"},
+              {"key":7, "loc":"400 520", "text":"Process Payment"},
+              {"key":-2, "category":"End", "loc":"400 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":9, "fromPort":"R", "toPort":"T", "visible":"true", "text":"Yes"},
+              {"from":4, "to":0, "fromPort":"L", "toPort":"B", "visible":"true", "text":"No"},
+              {"from":9, "to":6, "fromPort":"R", "toPort":"T", "visible":"true", "text":"Yes"},
+              {"from":9, "to":5, "fromPort":"L", "toPort":"T", "visible":"true", "text":"No"},
+              {"from":0, "to":1, "fromPort":"T", "toPort":"L"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"R"},
+              {"from":5, "to":7, "fromPort":"B", "toPort":"L"},
+              {"from":7, "to":-2, "fromPort":"B", "toPort":"T"}
+
+               ]});
+            }
+
+            browsing.onclick = function(){
+              myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"1"},
+              {"key":1, "loc":"175 100", "text":"In a bowl, blend: 1 cup margarine, 1.5 teaspoon vanilla, 1 teaspoon salt"},
+              {"key":2, "loc":"175 190", "text":"Gradually beat in 1 cup sugar and 2 cups sifted flour"},
+              {"key":3, "loc":"175 270", "text":"Mix in 6 oz (1 cup) Nestle's Semi-Sweet Chocolate Morsels"},
+              {"key":4, "loc":"175 370", "text":"Press evenly into ungreased 15x10x1 pan"},
+              {"key":5, "loc":"380 85", "text":"Finely chop 1/2 cup of your choice of nuts"},
+              {"key":6, "loc":"175 440", "text":"Sprinkle nuts on top"},
+              {"key":7, "loc":"175 500", "text":"Bake for 25 minutes and let cool"},
+              {"key":8, "loc":"175 570", "text":"Cut into rectangular grid"},
+              {"key":-2, "category":"End", "loc":"175 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":6, "fromPort":"B", "toPort":"T"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"T"},
+              {"from":7, "to":8, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":0, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":5, "fromPort":"B", "toPort":"T"},
+              {"from":5, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":0, "to":4, "fromPort":"B", "toPort":"T"}
+               ]});
+            } 
+
+            search.onclick = function(){
+              myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"2"},
+              {"key":1, "loc":"175 100", "text":"In a bowl, blend: 1 cup margarine, 1.5 teaspoon vanilla, 1 teaspoon salt"},
+              {"key":2, "loc":"175 190", "text":"Gradually beat in 1 cup sugar and 2 cups sifted flour"},
+              {"key":3, "loc":"175 270", "text":"Mix in 6 oz (1 cup) Nestle's Semi-Sweet Chocolate Morsels"},
+              {"key":4, "loc":"175 370", "text":"Press evenly into ungreased 15x10x1 pan"},
+              {"key":5, "loc":"380 85", "text":"Finely chop 1/2 cup of your choice of nuts"},
+              {"key":6, "loc":"175 440", "text":"Sprinkle nuts on top"},
+              {"key":7, "loc":"175 500", "text":"Bake for 25 minutes and let cool"},
+              {"key":8, "loc":"175 570", "text":"Cut into rectangular grid"},
+              {"key":-2, "category":"End", "loc":"175 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":6, "fromPort":"B", "toPort":"T"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"T"},
+              {"from":7, "to":8, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":0, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":5, "fromPort":"B", "toPort":"T"},
+              {"from":5, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":0, "to":4, "fromPort":"B", "toPort":"T"}
+               ]});
+            }
+
+            cart.onclick = function(){
+              myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"3"},
+              {"key":1, "loc":"175 100", "text":"In a bowl, blend: 1 cup margarine, 1.5 teaspoon vanilla, 1 teaspoon salt"},
+              {"key":2, "loc":"175 190", "text":"Gradually beat in 1 cup sugar and 2 cups sifted flour"},
+              {"key":3, "loc":"175 270", "text":"Mix in 6 oz (1 cup) Nestle's Semi-Sweet Chocolate Morsels"},
+              {"key":4, "loc":"175 370", "text":"Press evenly into ungreased 15x10x1 pan"},
+              {"key":5, "loc":"380 85", "text":"Finely chop 1/2 cup of your choice of nuts"},
+              {"key":6, "loc":"175 440", "text":"Sprinkle nuts on top"},
+              {"key":7, "loc":"175 500", "text":"Bake for 25 minutes and let cool"},
+              {"key":8, "loc":"175 570", "text":"Cut into rectangular grid"},
+              {"key":-2, "category":"End", "loc":"175 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":6, "fromPort":"B", "toPort":"T"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"T"},
+              {"from":7, "to":8, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":0, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":5, "fromPort":"B", "toPort":"T"},
+              {"from":5, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":0, "to":4, "fromPort":"B", "toPort":"T"}
+               ]});
+            }
+
+            payment.onclick = function(){
+              myDiagram.model = go.Model.fromJson({ "class": "go.GraphLinksModel",
+                "linkFromPortIdProperty": "fromPort",
+                "linkToPortIdProperty": "toPort",
+                "nodeDataArray": [
+              {"key":-1, "category":"Start", "loc":"175 0", "text":"Start"},
+              {"key":0, "loc":"-20 77", "text":"4"},
+              {"key":1, "loc":"175 100", "text":"In a bowl, blend: 1 cup margarine, 1.5 teaspoon vanilla, 1 teaspoon salt"},
+              {"key":2, "loc":"175 190", "text":"Gradually beat in 1 cup sugar and 2 cups sifted flour"},
+              {"key":3, "loc":"175 270", "text":"Mix in 6 oz (1 cup) Nestle's Semi-Sweet Chocolate Morsels"},
+              {"key":4, "loc":"175 370", "text":"Press evenly into ungreased 15x10x1 pan"},
+              {"key":5, "loc":"380 85", "text":"Finely chop 1/2 cup of your choice of nuts"},
+              {"key":6, "loc":"175 440", "text":"Sprinkle nuts on top"},
+              {"key":7, "loc":"175 500", "text":"Bake for 25 minutes and let cool"},
+              {"key":8, "loc":"175 570", "text":"Cut into rectangular grid"},
+              {"key":-2, "category":"End", "loc":"175 640", "text":"Enjoy!"}
+               ],
+                "linkDataArray": [
+              {"from":1, "to":2, "fromPort":"B", "toPort":"T"},
+              {"from":2, "to":3, "fromPort":"B", "toPort":"T"},
+              {"from":3, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":4, "to":6, "fromPort":"B", "toPort":"T"},
+              {"from":6, "to":7, "fromPort":"B", "toPort":"T"},
+              {"from":7, "to":8, "fromPort":"B", "toPort":"T"},
+              {"from":8, "to":-2, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":0, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":1, "fromPort":"B", "toPort":"T"},
+              {"from":-1, "to":5, "fromPort":"B", "toPort":"T"},
+              {"from":5, "to":4, "fromPort":"B", "toPort":"T"},
+              {"from":0, "to":4, "fromPort":"B", "toPort":"T"}
+               ]});
+            }
+        }    
+
+    </script>
+
+  </head>
+  <!-- LAYOUT: Apply "submenu-hover" class to body element to have sidebar submenu show on mouse hover -->
+  <!-- LAYOUT: Apply "sidebar-collapsed" class to body element to have collapsed sidebar -->
+  <!-- LAYOUT: Apply "sidebar-top" class to body element to have sidebar on top of the page -->
+  <!-- LAYOUT: Apply "sidebar-hover" class to body element to show sidebar only when your mouse is on left / right corner -->
+  <!-- LAYOUT: Apply "submenu-hover" class to body element to show sidebar submenu on mouse hover -->
+  <!-- LAYOUT: Apply "fixed-sidebar" class to body to have fixed sidebar -->
+  <!-- LAYOUT: Apply "fixed-topbar" class to body to have fixed topbar -->
+  <!-- LAYOUT: Apply "rtl" class to body to put the sidebar on the right side -->
+  <!-- LAYOUT: Apply "boxed" class to body to have your page with 1200px max width -->
+
+  <!-- THEME STYLE: Apply "theme-sdtl" for Sidebar Dark / Topbar Light -->
+  <!-- THEME STYLE: Apply  "theme sdtd" for Sidebar Dark / Topbar Dark -->
+  <!-- THEME STYLE: Apply "theme sltd" for Sidebar Light / Topbar Dark -->
+  <!-- THEME STYLE: Apply "theme sltl" for Sidebar Light / Topbar Light -->
+  
+  <!-- THEME COLOR: Apply "color-default" for dark color: #2B2E33 -->
+  <!-- THEME COLOR: Apply "color-primary" for primary color: #319DB5 -->
+  <!-- THEME COLOR: Apply "color-red" for red color: #C9625F -->
+  <!-- THEME COLOR: Apply "color-green" for green color: #18A689 -->
+  <!-- THEME COLOR: Apply "color-orange" for orange color: #B66D39 -->
+  <!-- THEME COLOR: Apply "color-purple" for purple color: #6E62B5 -->
+  <!-- THEME COLOR: Apply "color-blue" for blue color: #4A89DC -->
+  <!-- BEGIN BODY -->
+
+  <style type="text/css">
+    #simulator .img-responsive{
+      margin: 0 auto;
+    }
+  </style>
+  <body class="sidebar-top fixed-topbar fixed-sidebar theme-sdtl color-default" onload="init()">
+    <!--[if lt IE 7]>
+    <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+    <![endif]-->
+    <section>
+      <!-- BEGIN SIDEBAR -->
+      <div class="sidebar">
+        <div class="logopanel">
+          <h1>
+            <a href="dashboard.html"></a>
+          </h1>
+        </div>
+      </div>
+      <!-- END SIDEBAR -->
+      <div class="main-content">
+        <!-- BEGIN TOPBAR -->
+        <div class="topbar">
+          <div class="header-left">
+            <div class="topnav">
+              <ul class="nav nav-icons">
+                <li><a href="#" class="toggle-sidebar-top" data-rel="tooltip" data-placement="bottom" title="Add"><span class="octicon octicon-diff-added"></span></a></li>
+                <li><a href="#" data-rel="tooltip" data-placement="bottom" title="Apps"><span class="octicon octicon-file-submodule"></span></a></li>
+                <li><a href="#" data-rel="tooltip" data-placement="bottom" title="Docs"><span class="octicon octicon-file-text"></span></a></li>
+                <li><a href="#" data-rel="tooltip" data-placement="bottom" title="Explore"><span class="octicon octicon-globe"></span></a></li>
+                <li><a href="#" data-rel="tooltip" data-placement="bottom" title="Stuck! Help"><span class="octicon octicon-issue-opened"></span></a></li>
+              </ul>
+            </div>
+          </div>
+          <div class="header-right">
+            <ul class="header-menu nav navbar-nav">
+              <!-- BEGIN USER DROPDOWN -->
+              <li class="dropdown" id="language-header">
+                <a href="#" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+                <i class="icon-globe"></i>
+                <span>Language</span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a href="#" data-lang="en"><img src="../assets/global/images/flags/usa.png" alt="flag-english"> <span>English</span></a>
+                  </li>
+                  <li>
+                    <a href="#" data-lang="es"><img src="../assets/global/images/flags/spanish.png" alt="flag-english"> <span>Español</span></a>
+                  </li>
+                  <li>
+                    <a href="#" data-lang="fr"><img src="../assets/global/images/flags/french.png" alt="flag-english"> <span>Français</span></a>
+                  </li>
+                </ul>
+              </li>
+              <!-- END USER DROPDOWN -->
+              <!-- BEGIN NOTIFICATION DROPDOWN -->
+              <li class="dropdown" id="notifications-header">
+                <a href="#" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+                <i class="icon-bell"></i>
+                <span class="badge badge-danger badge-header">6</span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li class="dropdown-header clearfix">
+                    <p class="pull-left">12 Pending Notifications</p>
+                  </li>
+                  <li>
+                    <ul class="dropdown-menu-list withScroll" data-height="220">
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-star p-r-10 f-18 c-orange"></i>
+                        Dipankar have rated your photo
+                        <span class="dropdown-time">Just now</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-heart p-r-10 f-18 c-red"></i>
+                        PP added you to his favs
+                        <span class="dropdown-time">15 mins</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-file-text p-r-10 f-18"></i>
+                        New document available
+                        <span class="dropdown-time">22 mins</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-picture-o p-r-10 f-18 c-blue"></i>
+                        New picture added
+                        <span class="dropdown-time">40 mins</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-bell p-r-10 f-18 c-orange"></i>
+                        Meeting in 1 hour
+                        <span class="dropdown-time">1 hour</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-bell p-r-10 f-18"></i>
+                        Server 5 overloaded
+                        <span class="dropdown-time">2 hours</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-comment p-r-10 f-18 c-gray"></i>
+                        Bill comment your post
+                        <span class="dropdown-time">3 hours</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="#">
+                        <i class="fa fa-picture-o p-r-10 f-18 c-blue"></i>
+                        New picture added
+                        <span class="dropdown-time">2 days</span>
+                        </a>
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="dropdown-footer clearfix">
+                    <a href="#" class="pull-left">See all notifications</a>
+                    <a href="#" class="pull-right">
+                    <i class="icon-settings"></i>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+              <!-- END NOTIFICATION DROPDOWN -->
+              <!-- BEGIN MESSAGES DROPDOWN -->
+              <li class="dropdown" id="messages-header">
+                <a href="#" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+                <i class="icon-paper-plane"></i>
+                <span class="badge badge-primary badge-header">
+                8
+                </span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li class="dropdown-header clearfix">
+                    <p class="pull-left">
+                      You have 8 Messages
+                    </p>
+                  </li>
+                  <li class="dropdown-body">
+                    <ul class="dropdown-menu-list withScroll" data-height="220">
+                      <li class="clearfix">
+                        <span class="pull-left p-r-5">
+                        <img src="../assets/global/images/avatars/avatar3.png" alt="avatar 3">
+                        </span>
+                        <div class="clearfix">
+                          <div>
+                            <strong>Aaron</strong> 
+                            <small class="pull-right text-muted">
+                            <span class="glyphicon glyphicon-time p-r-5"></span>12 mins ago
+                            </small>
+                          </div>
+                          <p>Lorem ipsum dolor sit amet, consectetur...</p>
+                        </div>
+                      </li>
+                      <li class="clearfix">
+                        <span class="pull-left p-r-5">
+                        <img src="../assets/global/images/avatars/avatar4.png" alt="avatar 4">
+                        </span>
+                        <div class="clearfix">
+                          <div>
+                            <strong>PP</strong> 
+                            <small class="pull-right text-muted">
+                            <span class="glyphicon glyphicon-time p-r-5"></span>47 mins ago
+                            </small>
+                          </div>
+                          <p>Lorem ipsum dolor sit amet, consectetur...</p>
+                        </div>
+                      </li>
+                      <li class="clearfix">
+                        <span class="pull-left p-r-5">
+                        <img src="../assets/global/images/avatars/avatar5.png" alt="avatar 5">
+                        </span>
+                        <div class="clearfix">
+                          <div>
+                            <strong>Param</strong>  
+                            <small class="pull-right text-muted">
+                            <span class="glyphicon glyphicon-time p-r-5"></span>1 hour ago
+                            </small>
+                          </div>
+                          <p>Lorem ipsum dolor sit amet, consectetur...</p>
+                        </div>
+                      </li>
+                      <li class="clearfix">
+                        <span class="pull-left p-r-5">
+                        <img src="../assets/global/images/avatars/avatar6.png" alt="avatar 6">
+                        </span>
+                        <div class="clearfix">
+                          <div>
+                            <strong>Dipankar</strong> 
+                            <small class="pull-right text-muted">
+                            <span class="glyphicon glyphicon-time p-r-5"></span>2 days ago
+                            </small>
+                          </div>
+                          <p>Lorem ipsum dolor sit amet, consectetur...</p>
+                        </div>
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="dropdown-footer clearfix">
+                    <a href="mailbox.html" class="pull-left">See all messages</a>
+                    <a href="#" class="pull-right">
+                    <i class="icon-settings"></i>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+              <!-- END MESSAGES DROPDOWN -->
+              <!-- BEGIN USER DROPDOWN -->
+              <li class="dropdown" id="user-header">
+                <a href="#" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+                <img src="img/avtar.png" alt="user image">
+                <span class="username">Hi, User</span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a href="#"><i class="icon-user"></i><span>My Profile</span></a>
+                  </li>
+                  <li>
+                    <a href="#"><i class="icon-calendar"></i><span>My Calendar</span></a>
+                  </li>
+                  <li>
+                    <a href="#"><i class="icon-settings"></i><span>Account Settings</span></a>
+                  </li>
+                  <li>
+                    <a href="#"><i class="icon-logout"></i><span>Logout</span></a>
+                  </li>
+                </ul>
+              </li>
+              <!-- END USER DROPDOWN -->
+              <!-- CHAT BAR ICON -->
+              <li id="quickview-toggle"><a href="#"><i class="icon-bubbles"></i></a></li>
+            </ul>
+          </div>
+          <!-- header-right -->
+        </div>
+        <!-- END TOPBAR -->
+        <!-- BEGIN PAGE CONTENT -->
+        <div class="page-content">
+          <div class="header">
+            <div class="breadcrumb-wrapper">
+              <ol class="breadcrumb">
+                <li><a href="dashboard.html">Octo</a>
+                </li>
+                <li><a href="#">Pages</a>
+                </li>
+                <li class="active">Dashboard</li>
+              </ol>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-lg-12" style="height:1000px">
+              <div class="col-md-3">
+                
+                <div class="card grey lighten-5" style="height: auto; width: 100%">
+                  
+                  <div class="col-md-12 container-fluid" style="background-color: #f5f5f5;">
+                    <div class="col-md-2">
+                      <img src="img/avtar.png" class="img-circle" style="margin-top: 10px;">
+                    </div>
+                    <div class="col-md-8">
+                      <p class="bold text-left">Octo Says...</p>
+                    </div>
+                  </div>
+                  <div class="col-md-12 container-fluid" id="addtext" style="border-bottom: 1px solid #9e9e9e; height: 200px; width: 300px; background-color: #f5f5f5; width: 100%">
+                    <p class="bold"><br>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</p>
+                  </div>
+
+                </div>
+
+                <div class="card grey lighten-5" style="height: auto; width: 100%; position: relative;">
+                  
+                  <div class="col-md-12 container-fluid">
+                    
+                    <img src="img/bottomLine.png" class="img-responsive">
+
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-4 container-fluid" id="modalPopUp1" style="vertical-align: center">
+                      <img src="img/pop1.png" class="img-responsive">
+                    </div>
+                    <div class="col-md-4 container-fluid" id="modalPopUp2">
+                      <img src="img/pop1.png" class="img-responsive">              
+                    </div>
+                    <div class="col-md-4 container-fluid" id="modalPopUp3">
+                      <img src="img/pop1.png" class="img-responsive"> 
+                    </div>
+                    <!-- For Modal Pop-UP -->
+                      <div class="modal fade" id="modal-top" tabindex="-1" role="dialog" aria-hidden="true" id="showModal">
+                        <div class="modal-dialog modal-top">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <button type="button" class="close" data-dismiss="modal" aria-hidden="true"><i class="icons-office-52"></i></button>
+                              <h4 class="modal-title"><strong>Top Fullwidth</strong> modal</h4>
+                            </div>
+                            <div class="modal-body">
+                              My content...
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-default btn-embossed" data-dismiss="modal">Close</button>
+                              <button type="button" class="btn btn-primary btn-embossed" data-dismiss="modal">Save changes</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    <!-- Modal Pop Up Ends -->
+                  </div>
+
+                  <div class="col-md-12 container-fluid" style="position: absolute; bottom: 0;">
+                    
+                    <img src="img/bottomLine Copy.png" class="img-responsive" style="margin-top: 22px;">
+
+                  </div>
+
+                </div>
+
+                <div class="card grey lighten-5" style="height: 230px; width: 100%">
+                  
+                  <!-- Palette -->
+                  <div class="col-md-12" id="myPalette" style="margin-top: 20px; height: 125px; width: 100%;" >
+                    
+
+
+                  </div>
+                  <!-- Palette Ends -->
+
+                </div>
+                <div class="card grey lighten-5" style="height: 200px; width: 100%">
+                  
+                <div class="nav nav-tabs" style="margin-top: 20px;">
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Inbox" id="inbox"><span class="octicon octicon-inbox"></span></button></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Stories" id="stories"><span class="octicon octicon-device-camera-video"></span></button></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Actions" id="actions"><span class="octicon octicon-flame"></span></button></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Understanding" id="understand"><span class="octicon octicon-gear"></span></button></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Logs" id="logs"><span class="octicon octicon-server"></span></button></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-primary btn-transparent" data-rel="tooltip" data-placement="bottom" title="Settings" id="settings"><span class="octicon octicon-tools"></span></button></div>
+                </div>
+
+                </div>
+
+              </div>
+
+              <div class="col-md-6">
+
+                <div class="container-fluid col-md-12">
+                  
+
+                    <button type="button" class="btn btn-default btn-transparent" id="onboarding">Onboarding</button>
+                    <button type="button" class="btn btn-default btn-transparent" id="browsing">Browsing</button>
+                    <button type="button" class="btn btn-default btn-transparent" id="search">Search</button>
+                    <button type="button" class="btn btn-default btn-transparent" id="cart">Cart</button>
+                    <button type="button" class="btn btn-default btn-transparent" id="payment">Payment</button>
+
+                  
+
+                </div>
+
+                <div class="card grey lighten-5" style="height: 920px; width: 100%">
+                  
+                  <!-- Start Drawing Diagram -->
+                    <div class="fluid-container" style="width: 100%; height: 750px;">
+                      
+                      <div id="myDiagramDiv" style="width: 100%; height: 750px;">
+                          
+
+
+                      </div>
+
+                    </div>
+                  <!-- end Diagram -->
+
+                </div>                
+
+
+              </div>
+
+              <div class="col-md-3">
+                
+                <div class="card grey" style="height: 965px; width: 100%">
+                  
+                  <div class="col-md-12 container-fluid" style="margin-top: 20px;">
+                    <div class="form-group togglebutton togglebutton-material-blue">
+                        <label class="pull-left col-md-10 control-label"><strong>Telegram</strong></label>
+                        <label>
+                          <input type="checkbox" checked="" class="col-md-2 md-checkbox">
+                        </label>
+                    </div>
+                  </div>
+                  <div class="col-md-12 container-fluid">
+                    <div class="form-group togglebutton togglebutton-material-blue">
+                        <label class="pull-left col-md-10 control-label"><strong>FB Messenger</strong></label>
+                        <label>
+                          <input type="checkbox" class="col-md-2 md-checkbox">
+                        </label>
+                    </div>
+                  </div>
+                  <div class="col-md-12 container-fluid">
+                    <div class="form-group togglebutton togglebutton-material-blue">
+                        <label class="pull-left col-md-10 control-label"><strong>Whatsapp</strong></label>
+                        <label>
+                          <input type="checkbox" class="col-md-2 md-checkbox">
+                        </label>
+                    </div>
+                  </div>
+
+                  <div class="col-md-9"><h3><strong>Plugins</strong></h3></div>
+
+                  
+                      
+                    <div class="col-md-3">
+                      <div class="radio radio-info">
+                        <label>
+                          <input type="radio" name="r-info" value="option1" checked="" class="md-radio">
+                          1
+                        </label>
+                      </div>
+                      <div class="radio radio-info">
+                        <label>
+                          <input type="radio" name="r-info" value="option1" class="md-radio">
+                          2
+                        </label>
+                      </div>
+                      <div class="radio radio-info">
+                        <label>
+                          <input type="radio" name="r-info" value="option1" class="md-radio">
+                          3
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="col-md-12 container-fluid" id="simulator">
+                      <img src="img/iphone.png" class="img-responsive" height="470">
+                    </div>
+
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="copyright">
+              <p class="pull-left sm-pull-reset">
+                <span>Copyright <span class="copyright">©</span> 2016 </span>
+                <span>Octomatic</span>.
+                <span>All rights reserved. </span>
+              </p>
+              <p class="pull-right sm-pull-reset">
+                <span><a href="#" class="m-r-10">Support</a> | <a href="#" class="m-l-10 m-r-10">Terms of use</a> | <a href="#" class="m-l-10">Privacy Policy</a></span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <!-- END PAGE CONTENT -->
+      </div>
+      <!-- END MAIN CONTENT -->
+    </section>
+    <!-- BEGIN QUICKVIEW SIDEBAR -->
+    <div id="quickview-sidebar">
+      <div class="quickview-header">
+        <ul class="nav nav-tabs">
+          <li class="active"><a href="#chat" data-toggle="tab">Chat</a></li>
+          <li><a href="#notes" data-toggle="tab">Notes</a></li>
+          <li><a href="#settings" data-toggle="tab" class="settings-tab">Settings</a></li>
+        </ul>
+      </div>
+      <div class="quickview">
+        <div class="tab-content">
+          <div class="tab-pane fade active in" id="chat">
+            <div class="chat-body current">
+              <div class="chat-search">
+                <form class="form-inverse" action="#" role="search">
+                  <div class="append-icon">
+                    <input type="text" class="form-control" placeholder="Search contact...">
+                    <i class="icon-magnifier"></i>
+                  </div>
+                </form>
+              </div>
+              <div class="chat-groups">
+                <div class="title">GROUP CHATS</div>
+                <ul>
+                  <li><i class="turquoise"></i> Favorites</li>
+                  <li><i class="turquoise"></i> Office Work</li>
+                  <li><i class="turquoise"></i> Friends</li>
+                </ul>
+              </div>
+              <div class="chat-list">
+                <div class="title">FAVORITES</div>
+                <ul>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar13.png" alt="avatar" />
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">Dipankar</div>
+                      <div class="user-txt">On the road again...</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="online"></i>
+                    </div>
+                  </li>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar5.png" alt="avatar" />
+                      <div class="pull-right badge badge-danger">3</div>
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">PP</div>
+                      <div class="user-txt">Still at the beach</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="away"></i>
+                    </div>
+                  </li>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar10.png" alt="avatar" />
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">Swapnil</div>
+                      <div class="user-txt">On stage...</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="busy"></i>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <div class="chat-list">
+                <div class="title">FRIENDS</div>
+                <ul>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar7.png" alt="avatar" />
+                      <div class="pull-right badge badge-danger">3</div>
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">PP</div>
+                      <div class="user-txt">At work...</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="online"></i>
+                    </div>
+                  </li>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar11.png" alt="avatar" />
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">Aaron</div>
+                      <div class="user-txt">Waiting for tonight</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="offline"></i>
+                    </div>
+                  </li>
+                  <li class="clearfix">
+                    <div class="user-img">
+                      <img src="../assets/global/images/avatars/avatar8.png" alt="avatar" />
+                    </div>
+                    <div class="user-details">
+                      <div class="user-name">Ravin</div>
+                      <div class="user-txt">On my way to NYC</div>
+                    </div>
+                    <div class="user-status">
+                      <i class="offline"></i>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="chat-conversation">
+              <div class="conversation-header">
+                <div class="user clearfix">
+                  <div class="chat-back">
+                    <i class="icon-action-undo"></i>
+                  </div>
+                  <div class="user-details">
+                    <div class="user-name">Dipankar</div>
+                    <div class="user-txt">On the road again...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="conversation-body">
+                <ul>
+                  <li class="img">
+                    <div class="chat-detail">
+                      <span class="chat-date">today, 10:38pm</span>
+                      <div class="conversation-img">
+                        <img src="../assets/global/images/avatars/avatar4.png" alt="avatar 4"/>
+                      </div>
+                      <div class="chat-bubble">
+                        <span>Hi you!</span>
+                      </div>
+                    </div>
+                  </li>
+                  <li class="img">
+                    <div class="chat-detail">
+                      <span class="chat-date">today, 10:45pm</span>
+                      <div class="conversation-img">
+                        <img src="../assets/global/images/avatars/avatar4.png" alt="avatar 4"/>
+                      </div>
+                      <div class="chat-bubble">
+                        <span>Are you there?</span>
+                      </div>
+                    </div>
+                  </li>
+                  <li class="img">
+                    <div class="chat-detail">
+                      <span class="chat-date">today, 10:51pm</span>
+                      <div class="conversation-img">
+                        <img src="../assets/global/images/avatars/avatar4.png" alt="avatar 4"/>
+                      </div>
+                      <div class="chat-bubble">
+                        <span>Send me a message when you come back.</span>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <div class="conversation-message">
+                <input type="text" placeholder="Your message..." class="form-control form-white send-message" />
+                <div class="item-footer clearfix">
+                  <div class="footer-actions">
+                    <i class="icon-rounded-marker"></i>
+                    <i class="icon-rounded-camera"></i>
+                    <i class="icon-rounded-paperclip-oblique"></i>
+                    <i class="icon-rounded-alarm-clock"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="notes">
+            <div class="list-notes current withScroll">
+              <div class="notes ">
+                <div class="row">
+                  <div class="col-md-12">
+                    <div id="add-note">
+                      <i class="fa fa-plus"></i>ADD A NEW NOTE
+                    </div>
+                  </div>
+                </div>
+                <div id="notes-list">
+                  <div class="note-item media current fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Reset my account password</p>
+                      </div>
+                      <p class="note-desc hidden">Break security reasons.</p>
+                      <p><small>Tuesday 6 May, 3:52 pm</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Call PP</p>
+                      </div>
+                      <p class="note-desc hidden">He have my laptop!</p>
+                      <p><small>Thursday 8 May, 2:28 pm</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Buy a car</p>
+                      </div>
+                      <p class="note-desc hidden">I'm done with the bus</p>
+                      <p><small>Monday 12 May, 3:43 am</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Don't forget my notes</p>
+                      </div>
+                      <p class="note-desc hidden">I have to read them...</p>
+                      <p><small>Wednesday 5 May, 6:15 pm</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media current fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Reset my account password</p>
+                      </div>
+                      <p class="note-desc hidden">Break security reasons.</p>
+                      <p><small>Tuesday 6 May, 3:52 pm</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Call Dipankar</p>
+                      </div>
+                      <p class="note-desc hidden">He have my laptop!</p>
+                      <p><small>Thursday 8 May, 2:28 pm</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Buy a car</p>
+                      </div>
+                      <p class="note-desc hidden">I'm done with the bus</p>
+                      <p><small>Monday 12 May, 3:43 am</small></p>
+                    </div>
+                  </div>
+                  <div class="note-item media fade in">
+                    <button class="close">×</button>
+                    <div>
+                      <div>
+                        <p class="note-name">Don't forget my notes</p>
+                      </div>
+                      <p class="note-desc hidden">I have to read them...</p>
+                      <p><small>Wednesday 5 May, 6:15 pm</small></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="detail-note note-hidden-sm">
+              <div class="note-header clearfix">
+                <div class="note-back">
+                  <i class="icon-action-undo"></i>
+                </div>
+                <div class="note-edit">Edit Note</div>
+                <div class="note-subtitle">title on first line</div>
+              </div>
+              <div id="note-detail">
+                <div class="note-write">
+                  <textarea class="form-control" placeholder="Type your note here"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="settings">
+            <div class="settings">
+              <div class="title">ACCOUNT SETTINGS</div>
+              <div class="setting">
+                <span> Show Personal Statut</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input" checked>
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+                <p class="setting-info">Lorem ipsum dolor sit amet consectetuer.</p>
+              </div>
+              <div class="setting">
+                <span> Show my Picture</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input" checked>
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+                <p class="setting-info">Lorem ipsum dolor sit amet consectetuer.</p>
+              </div>
+              <div class="setting">
+                <span> Show my Location</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input">
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+                <p class="setting-info">Lorem ipsum dolor sit amet consectetuer.</p>
+              </div>
+              <div class="title">CHAT</div>
+              <div class="setting">
+                <span> Show User Image</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input" checked>
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+              </div>
+              <div class="setting">
+                <span> Show Fullname</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input" checked>
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+              </div>
+              <div class="setting">
+                <span> Show Location</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input">
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+              </div>
+              <div class="setting">
+                <span> Show Unread Count</span>
+                <label class="switch pull-right">
+                <input type="checkbox" class="switch-input" checked>
+                <span class="switch-label" data-on="On" data-off="Off"></span>
+                <span class="switch-handle"></span>
+                </label>
+              </div>
+              <div class="title">STATISTICS</div>
+              <div class="settings-chart">
+                <div class="clearfix">
+                  <div class="chart-title">Stat 1</div>
+                  <div class="chart-number">82%</div>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar progress-bar-primary setting1" data-transitiongoal="82"></div>
+                </div>
+              </div>
+              <div class="settings-chart">
+                <div class="clearfix">
+                  <div class="chart-title">Stat 2</div>
+                  <div class="chart-number">43%</div>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar progress-bar-primary setting2" data-transitiongoal="43"></div>
+                </div>
+              </div>
+              <div class="m-t-30" style="width:100%">
+                <canvas id="setting-chart" height="300"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- END QUICKVIEW SIDEBAR -->
+    <!-- BEGIN SEARCH -->
+    <div id="morphsearch" class="morphsearch">
+      <form class="morphsearch-form">
+        <input class="morphsearch-input" type="search" placeholder="Search..."/>
+        <button class="morphsearch-submit" type="submit">Search</button>
+      </form>
+      <div class="morphsearch-content withScroll">
+        <div class="dummy-column user-column">
+          <h2>Users</h2>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar1_big.png" alt="Avatar 1"/>
+            <h3>John Smith</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar2_big.png" alt="Avatar 2"/>
+            <h3>Bod Dylan</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar3_big.png" alt="Avatar 3"/>
+            <h3>Jenny Finlan</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar4_big.png" alt="Avatar 4"/>
+            <h3>Harold Fox</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar5_big.png" alt="Avatar 5"/>
+            <h3>Martin Hendrix</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/avatars/avatar6_big.png" alt="Avatar 6"/>
+            <h3>Paul Ferguson</h3>
+          </a>
+        </div>
+        <div class="dummy-column">
+          <h2>Articles</h2>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/1.jpg" alt="1"/>
+            <h3>How to change webdesign?</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/2.jpg" alt="2"/>
+            <h3>News From the sky</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/3.jpg" alt="3"/>
+            <h3>Where is the cat?</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/4.jpg" alt="4"/>
+            <h3>Just another funny story</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/5.jpg" alt="5"/>
+            <h3>How many water we drink every day?</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/6.jpg" alt="6"/>
+            <h3>Drag and drop tutorials</h3>
+          </a>
+        </div>
+        <div class="dummy-column">
+          <h2>Recent</h2>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/7.jpg" alt="7"/>
+            <h3>Design Inspiration</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/8.jpg" alt="8"/>
+            <h3>Animals drawing</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/9.jpg" alt="9"/>
+            <h3>Cup of tea please</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/10.jpg" alt="10"/>
+            <h3>New application arrive</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/11.jpg" alt="11"/>
+            <h3>Notification prettify</h3>
+          </a>
+          <a class="dummy-media-object" href="#">
+            <img src="../assets/global/images/gallery/12.jpg" alt="12"/>
+            <h3>My article is the last recent</h3>
+          </a>
+        </div>
+      </div>
+      <!-- /morphsearch-content -->
+      <span class="morphsearch-close"></span>
+    </div>
+    <!-- END QUICKVIEW SIDEBAR -->
+    <!-- BEGIN PRELOADER -->
+    <div class="loader-overlay">
+      <div class="spinner">
+        <div class="bounce1"></div>
+        <div class="bounce2"></div>
+        <div class="bounce3"></div>
+      </div>
+    </div>
+
+    <!-- END PRELOADER -->
+    <a href="#" class="scrollup"><i class="fa fa-angle-up"></i></a> 
+    <script src="../assets/global/plugins/jquery/jquery-1.11.1.min.js"></script>
+    <script src="../assets/global/plugins/jquery/jquery-migrate-1.2.1.min.js"></script>
+    <script src="../assets/global/plugins/jquery-ui/jquery-ui-1.11.2.min.js"></script>
+    <script src="../assets/global/plugins/gsap/main-gsap.min.js"></script>
+    <script src="../assets/global/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../assets/global/plugins/jquery-cookies/jquery.cookies.min.js"></script> <!-- Jquery Cookies, for theme -->
+    <script src="../assets/global/plugins/jquery-block-ui/jquery.blockUI.min.js"></script> <!-- simulate synchronous behavior when using AJAX -->
+    <script src="../assets/global/plugins/bootbox/bootbox.min.js"></script> <!-- Modal with Validation -->
+    <script src="../assets/global/plugins/mcustom-scrollbar/jquery.mCustomScrollbar.concat.min.js"></script> <!-- Custom Scrollbar sidebar -->
+    <script src="../assets/global/plugins/bootstrap-dropdown/bootstrap-hover-dropdown.min.js"></script> <!-- Show Dropdown on Mouseover -->
+    <script src="../assets/global/plugins/charts-sparkline/sparkline.min.js"></script> <!-- Charts Sparkline -->
+    <script src="../assets/global/plugins/select2/select2.min.js"></script> <!-- Select Inputs -->
+    <script src="../assets/global/plugins/icheck/icheck.min.js"></script> <!-- Checkbox & Radio Inputs -->
+    <script src="../assets/global/plugins/backstretch/backstretch.min.js"></script> <!-- Background Image -->
+    <script src="../assets/global/plugins/bootstrap-progressbar/bootstrap-progressbar.min.js"></script> <!-- Animated Progress Bar -->
+    <script src="../assets/global/plugins/charts-chartjs/Chart.min.js"></script>
+    <script src="../assets/global/js/builder.js"></script> <!-- Theme Builder -->
+    <script src="../assets/global/js/sidebar_hover.js"></script> <!-- Sidebar on Hover -->
+    <script src="../assets/global/js/widgets/notes.js"></script> <!-- Notes Widget -->
+    <script src="../assets/global/js/quickview.js"></script> <!-- Chat Script -->
+    <script src="../assets/global/js/pages/search.js"></script> <!-- Search Script -->
+    <script src="../assets/global/js/plugins.js"></script> <!-- Main Plugin Initialization Script -->
+    <script src="../assets/global/js/application.js"></script> <!-- Main Application Script -->
+    <script src="../assets/admin/md-layout1/material-design/js/material.js"></script>
+    <script src="../assets/admin/layout4/js/layout.js"></script> <!-- Main Application Script -->
+    <script>
+      $.material.init();
+      $(document).ready(function(){
+        $("#modalPopUp1, #modalPopUp2, #modalPopUp3").on("click", function(){
+          $('.modal').modal({
+            show: true
+          });
+        });
+
+        $("#inbox").on("mouseover",function(){
+          $("#addtext").html("<br><p><b>Check inbox to checkout the mail regarding your subscriptions.. as;djf;asjdfl;a sdfjasdk;flj asdfjal;dsjf asdjfka sdfjka;sdfl;jasd f;ajsdfk;l asdj;fl</b> </p>");
+        });
+          $("#inbox").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover anything that makes you feel sick. Our smart bot will help you out.</b>");
+        });
+
+        $("#stories").on("mouseover",function(){
+          $("#addtext").html("<br><b>Click here to check your timeline your experience with Octo</b>");
+        });
+          $("#stories").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#actions").on("mouseover",function(){
+          $("#addtext").html("<br> <b>This will show you the list of actions that you can use to achieve a particular target</b>");
+        });
+          $("#actions").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#understand").on("mouseover",function(){
+          $("#addtext").html("<br><b>Learn the basics of Octo bot and how to configure it.</b>");
+        });
+          $("#understand").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#logs").on("mouseover",function(){
+          $("#addtext").html("<br><b>Your working history.</b>");
+        });
+          $("#logs").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#settings").on("mouseover",function(){
+          $("#addtext").html("<br><b>Configuration of the page.</b>");
+        });
+          $("#settings").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b></b>");
+        });
+
+        $("#onboarding").on("mouseover",function(){
+          $("#addtext").html("<br><b>Take the respective steps for onboarding</b>");
+        });
+          $("#onboarding").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#browsing").on("mouseover",function(){
+          $("#addtext").html("<br><b>Define the content the user can surf.</b>");
+        });
+          $("#browsing").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#search").on("mouseover",function(){
+          $("#addtext").html("<br><b>Search Search Search Search Search Search Search Search Search Search SearchSearch Search Search Search Search Search Search</b></b>");
+        });
+          $("#search").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#cart").on("mouseover",function(){
+          $("#addtext").html("<br><b>Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart Cart.</b>");
+        });
+          $("#cart").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+        $("#payment").on("mouseover",function(){
+          $("#addtext").html("<br><b>Payment payment payment payment payment payment payment payment payment payment payment payment</b> ");
+        });
+          $("#payment").on("mouseout",function(){
+          $("#addtext").html("<br><b>Hover at anything that makes you feel sick. Our smart Octobot will help you out.</b>");
+        });
+
+      });
+    </script>
+  </body>
+</html>
